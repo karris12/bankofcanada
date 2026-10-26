@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #SBATCH --job-name=rate-risk
 #SBATCH --array=0-3%2
+#SBATCH --partition=hpc
 #SBATCH --ntasks=1
 #SBATCH --cpus-per-task=1
 #SBATCH --time=00:05:00

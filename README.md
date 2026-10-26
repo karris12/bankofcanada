@@ -15,7 +15,7 @@ A small, reproducible HPC demonstration for a Cloud HPC Architect interview. It 
 
 - [`workload/`](workload/) - simulation, aggregation, and Slurm job-array script.
 - [`tests/`](tests/) - standard-library tests; no Python packages to install.
-- [`docs/DEMO_RUNBOOK.md`](docs/DEMO_RUNBOOK.md) - local validation, Azure setup, live demo, interview talk track, and cleanup.
+- [`docs/DEMO_RUNBOOK.md`](docs/DEMO_RUNBOOK.md) - beginner-friendly PowerShell/local steps, Azure portal provisioning, secure login, Linux commands with example output, troubleshooting, and cleanup.
 
 ## Validate locally first
 
@@ -61,7 +61,9 @@ The same task program runs in the Slurm array. The serial local run is a functio
 
 Deploy a small Azure CycleCloud Workspace for Slurm (or an existing CycleCloud Slurm 4 environment), cap the execute partition at **two small CPU nodes**, submit the four-task array, inspect job and node states, aggregate the results, record elapsed time and cost, then delete the demo resources.
 
-**Do not assume the Azure Free Account makes this deployment free or that `$180` will cover a particular runtime.** VM availability, regional prices, disks, networking, Marketplace terms, quotas, and remaining-credit expiry all matter. Read the [cost and setup checklist](docs/DEMO_RUNBOOK.md#azure-setup-and-cost-guardrails) before creating anything. This repository does not deploy Azure resources automatically.
+**Start with the [beginner's walkthrough](docs/DEMO_RUNBOOK.md), not with Azure commands.** It separates deploying the CycleCloud workspace from creating the Slurm cluster and shows the exact order to proceed.
+
+**Do not assume the Azure Free Account makes this deployment free or that `$180` will cover a particular runtime.** VM availability, regional prices, disks, networking, secure login, Marketplace terms, quotas, and remaining-credit expiry all matter. Check the [cost and setup checklist](docs/DEMO_RUNBOOK.md#important-should-you-deploy-to-azure) before provisioning anything. This repository does not deploy Azure resources automatically.
 
 ## Official references
 
