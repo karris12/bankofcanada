@@ -130,13 +130,13 @@ In the CycleCloud web portal:
 1. Open **Clusters** and choose **Add**. Select the supplied **Slurm** template. If Slurm is not offered, do not choose another scheduler; stop and follow the official [Slurm 4 project setup](https://learn.microsoft.com/azure/cyclecloud/slurm-4?view=cyclecloud-8) or ask for help.
 2. Enter a short cluster name such as `interview-slurm`. Cluster names are also used in commands, so use the same spelling later.
 3. Select the subscription credentials, region, and virtual-network/subnet associated with the workspace. If the form doesn't show these choices, or the only choices refer to a different subscription/network, stop rather than guessing.
-4. In the cluster parameters, choose a small **CPU-only** execute VM available in this region. Use the `hpc` partition for this demo. Set its autoscaling limit to **no more than 4 total compute cores** (not 4 nodes). This is the safety limit; it will normally allow no more than two 2-core worker VMs. Keep GPU capacity at zero. Parameter names vary across Slurm template versions; look for **Max HPC Cores**, **Max Cores**, or the equivalent limit, and verify the selected VM's core count. If you cannot find a way to impose a low hard limit, do not start the cluster.
+4. In the cluster parameters, choose a small **CPU-only** execute VM available in this region. These independent simulation tasks fit the **HTC** (high-throughput computing) partition. Set the HTC maximum to **2 nodes**. If the form asks for cores instead of nodes, choose a 2-vCPU VM and set the HTC limit to **4 total cores**. Set the HPC maximum to **0** if allowed; otherwise set it to **1** and leave that partition unused. Keep GPU capacity at zero. Check the form's units and selected VM's vCPU count; if you cannot confirm a low hard limit, do not start the cluster.
 5. Use only the minimum storage and login options required by the template; leave optional high-performance filesystems and databases disabled for this short job. Review the form for optional billable resources.
 6. Select **Save** to create the cluster definition. Saving a definition is not the same as starting its VMs. Recheck its VM type and core/node cap in **Edit** before starting.
 7. Select **Start** and confirm. CycleCloud requests and configures the cluster VMs. Wait for the scheduler and login nodes to reach their ready/started state. Provisioning can take several minutes; VM quota or capacity can delay or prevent startup.
 8. Watch Azure Cost Management and the resource group while starting. If you see an unexpected VM size, extra service, or resource count, stop and investigate.
 
-CycleCloud's Slurm 4 template includes partitions such as `hpc`, `htc`, `gpu`, and `dynamic`. For this project, submit to `hpc` only. The job script limits the array to two concurrently running tasks; the cluster's separate four-core limit caps compute capacity.
+CycleCloud's Slurm 4 template includes partitions such as `hpc`, `htc`, `gpu`, and `dynamic`. The `hpc` partition is for tightly coupled workloads; `htc` is for independent, high-throughput jobs. These four Monte Carlo tasks do not need to communicate with one another, so use `htc`. The job script limits the array to two concurrently running tasks; the cluster's two-node HTC limit caps compute capacity.
 
 ## 5. Connect to the login node
 
@@ -193,10 +193,10 @@ If `git clone` reports a network/DNS error, the login node might not have outbou
 Check that the scheduler can run a command on a compute node and read the script from this directory:
 
 ```bash
-srun --partition=hpc --nodes=1 --ntasks=1 hostname
-srun --partition=hpc --nodes=1 --ntasks=1 test -r "$PWD/workload/simulate_rate_risk.py"
+srun --partition=htc --nodes=1 --ntasks=1 hostname
+srun --partition=htc --nodes=1 --ntasks=1 test -r "$PWD/workload/simulate_rate_risk.py"
 echo $?
-srun --partition=hpc --nodes=1 --ntasks=1 python3 --version
+srun --partition=htc --nodes=1 --ntasks=1 python3 --version
 ```
 
 Expected: `hostname` prints a compute-node name; `echo $?` prints `0`; Python prints a version. The first `srun` might wait while CycleCloud provisions an execute node. If the script check fails, the login-node directory is not visible to compute nodes. Stop here and ask how to use the shared home/work directory for this deployment; do not submit the array from a non-shared folder.
@@ -207,7 +207,7 @@ Still in the Linux login-node terminal, from the `bankofcanada` repository direc
 
 ```bash
 mkdir -p results
-sbatch --partition=hpc workload/slurm_array.sbatch
+sbatch --partition=htc workload/slurm_array.sbatch
 ```
 
 Expected response:
@@ -222,7 +222,7 @@ While the job is queued or running, inspect it:
 
 ```bash
 squeue --jobs 12345
-sinfo --partition=hpc
+sinfo --partition=htc
 ```
 
 Illustrative output (states and node names vary):
@@ -237,7 +237,7 @@ JOBID  PARTITION  NAME       USER       ST  TIME  NODES  NODELIST(REASON)
 The Slurm script runs four tasks (`0` to `3`) with at most two running concurrently. By default each task uses 100,000 samples. To make the run last a little longer for a live demo, submit **one** bounded array with 500,000 samples per task:
 
 ```bash
-SAMPLES_PER_TASK=500000 sbatch --partition=hpc workload/slurm_array.sbatch
+SAMPLES_PER_TASK=500000 sbatch --partition=htc workload/slurm_array.sbatch
 ```
 
 If you use this second command, copy and use its newly returned job ID instead. Do not repeatedly submit jobs or raise the four-core cluster limit to make the demo look busier.
