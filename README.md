@@ -23,7 +23,7 @@ Elapsed seconds: 0.01
 
 ## Run on your CycleCloud Slurm cluster
 
-Read [`docs/DEMO_RUNBOOK.md`](docs/DEMO_RUNBOOK.md) for the short Azure, quota, login, and Slurm walkthrough. Run these commands **on the Linux Slurm login node**, from this repository's directory:
+Read [`docs/DEMO_RUNBOOK.md`](docs/DEMO_RUNBOOK.md) for the start-to-finish guide. It explains the existing East US quota failure, how to reuse the current Azure deployment, connect to the login node, and run and show the job. Run these commands **on the Linux Slurm login node**, from this repository's directory:
 
 ```bash
 sbatch workload/demo.sbatch

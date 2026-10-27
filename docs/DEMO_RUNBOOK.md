@@ -1,39 +1,45 @@
-# Simple CycleCloud + Slurm demo
+# Start-to-finish guide: the tiny CycleCloud + Slurm demo
 
-This version is deliberately small: one Python file, one Slurm job, one output file. The job estimates pi using random points. You will practice the core Slurm flow: **submit → check → read the output**.
+This guide is written for a first Slurm demo. It uses one Python program and one Slurm job:
 
-## Important: your Azure quota error
+1. Estimate pi with randomly generated points.
+2. Ask Slurm to run the program on **one HTC worker node**.
+3. Check the job and read its output.
 
-Your latest error says East US has a **4-core limit, all 4 cores are in use**, and a failed VM needs **4 additional cores**. The requested VM cannot start until Azure approves more regional quota.
+It does not use a job array, a database, extra Python packages, or real financial data.
 
-Before retrying:
+## Important: your Azure workspace already exists
 
-1. In Azure portal, open **Quotas** for **Compute → East US**. Check **Total Regional vCPUs** and any VM-family quota shown in the failure.
-2. Ask your Azure subscription administrator (or submit a quota-increase request) for enough quota to cover the existing 4-core CycleCloud VM, the Slurm scheduler/login VM or VMs, and **one small HTC worker**. The error's 8-core minimum covers only the currently failing 4-core VM in addition to today's usage; it might not leave cores for the demo worker. Check the actual VM sizes in CycleCloud before choosing a request.
-3. Check Cost Management. A quota increase is not a VM; starting the nodes uses billable resources. If quota is denied or the estimate is uncomfortable, don't keep retrying. You can still practice the program locally.
+You have already provisioned `rg-hpc-interview-demo` in East US, the CycleCloud VM (`ccw-cyclecloud-vm`), the network, storage, and a Bastion. **Do not create another CycleCloud Workspace or delete this resource group just to restart the demo.** Those resources can cost money while you work on the Slurm quota issue.
 
-The VM quota error must be fixed before Slurm commands can run on a worker. `sbatch` submits to a working Slurm scheduler; it does not create missing quota or repair a failed cluster node.
-
-## What this demo does
-
-The Python program throws random points into a square. A circle fits inside that square. It estimates pi by counting the points that land inside the circle:
+Your latest Azure error said:
 
 ```text
-pi estimate = 4 x (points inside circle / all points)
+Current regional core limit: 4
+Current usage:               4
+Failed VM needs:             4 additional cores
+Minimum limit for that VM:   8
 ```
 
-More points usually give a closer estimate. This is a toy compute workload, not a financial model.
+The CycleCloud VM is `Standard_D4as_v4`, which uses 4 vCPUs. Azure has no regional quota left for the failed Slurm VM. The error's 8-core limit is only enough to cover the existing 4-core VM plus that one requested 4-core VM. It does **not** prove there will be quota left for an HTC worker.
 
-## 1. Test the program on Windows first
+**First get a quota increase approved, and check cost. Don't press Retry or start additional VMs until that is done.** A quota request doesn't run VMs, but the VMs and Bastion may accrue charges when running. A Cost Management budget is an alert, not a hard spending cap.
 
-Open PowerShell in your local repository:
+## Step 1: Prepare the simplified project on your Windows computer
+
+The project is already in your local repository. Open **Windows PowerShell** and run:
 
 ```powershell
 Set-Location "$HOME\Documents\devopsProject\hpc"
+git pull
+python --version
+python -m unittest discover -s tests -v
 python workload\estimate_pi.py --points 10000 --seed 42
 ```
 
-Example output (your timings and count may differ):
+The tests should finish with `OK`.
+
+Expected output looks like this:
 
 ```text
 Points: 10000
@@ -42,26 +48,62 @@ Estimated pi: 3.126000
 Elapsed seconds: 0.01
 ```
 
-## 2. Wait for the Slurm cluster to be healthy
+Your elapsed time may differ. This checks Python and the demo locally, without Azure.
 
-Open CycleCloud in the browser. The cluster needs a healthy scheduler and a login node before you can submit a job. Resolve the quota failure above first; then use **Retry** on the failed node only if the quota is approved and the node configuration is still correct.
+## Step 2: Check the Azure deployment and calculate the quota you need
 
-For this low-cost demo, configure **one maximum HTC worker node**, using the smallest suitable CPU VM permitted by quota. Do not start HPC or GPU nodes. HTC is suitable because the demo is a standalone task and doesn't need tightly coupled multi-node communication. If the CycleCloud form requires a minimum HPC value, leave it at its minimum and do not submit a job to that partition.
+Use the Azure portal. Make sure the selected subscription is the one containing `rg-hpc-interview-demo`.
 
-Wait until CycleCloud reports the required scheduler/login nodes as ready and no node is failed. The demo compute node can be created on demand when Slurm starts the job. Keep checking Cost Management; the CycleCloud VM and Bastion can incur costs even while Slurm is idle.
+1. Open **Resource groups** > `rg-hpc-interview-demo` > **Resources**. Identify the CycleCloud VM, Bastion, and any Slurm scheduler or login VMs.
+2. In CycleCloud, select the failed node and record its **VM size and vCPU count**. Check any other scheduler/login node sizes too.
+3. For this simple demo, plan for **one HTC worker maximum**, using the smallest suitable CPU VM available in East US. Do not start HPC, GPU, a second worker, or optional databases.
+4. Add up the vCPUs of all VMs that must be running at the same time: the current CycleCloud VM plus the Slurm scheduler/login VMs plus one HTC worker. Compare the total to **Total Regional vCPUs**. Also check the quota for the VM family used by the selected worker and scheduler. Azure enforces both regional and VM-family quotas.
+5. In Azure portal search for **Quotas** > **Compute**. Select **East US** and review **Total Regional vCPUs** and the relevant VM-family quota. Request a limit that covers the total you calculated—not merely the `8` cores in the original failure. Ask your subscription administrator to submit/approve the request if your account can't do it.
+6. Wait for the quota request to show as approved, then check the quota page again. If the quota is denied, ask the administrator about another supported region or stop the cloud demo; do not keep retrying the node.
+7. Check **Cost Management + Billing** and confirm the remaining credit and expiration date. Price the already-running CycleCloud VM and Bastion plus the planned scheduler/login and one worker. If the full run is not comfortably affordable within your credit, stop and use the local demo.
 
-## 3. Connect to the Linux Slurm login node
+Microsoft's instructions: [request an Azure VM quota increase](https://learn.microsoft.com/azure/quotas/per-vm-quota-requests) and [plan a CycleCloud Workspace deployment](https://learn.microsoft.com/azure/cyclecloud/how-to/ccws/plan-your-deployment?view=cyclecloud-8).
 
-Use the secure login-node access method configured in your Azure deployment. For the workspace you described, use Azure Bastion as in Microsoft's [login-node access guide](https://learn.microsoft.com/azure/cyclecloud/how-to/ccws/connect-to-login-node-with-bastion?view=cyclecloud-8). Select the **login/authentication node** in CycleCloud and copy its VM resource ID; do not use the CycleCloud VM's resource ID for Slurm commands.
+## Step 3: Set a small Slurm cluster limit
 
-From Windows PowerShell, sign in and set your subscription:
+Open the CycleCloud web page that you already accessed at `https://localhost:8443`. Find the existing cluster (your dashboard previously showed a cluster named `ccw`) and its failed node. **Do not create a second workspace.**
+
+1. Confirm this existing cluster uses the **Slurm** template. If it does not, stop and ask before creating a new cluster.
+2. Open **Edit** for the Slurm cluster.
+3. Choose a small CPU-only execute VM supported by your quota.
+4. Set the **HTC maximum to 1 node**. If the form has a core limit instead, use the worker VM's vCPU count as the limit for one worker. This demo needs one CPU for its job, but Azure quota counts the full VM's vCPUs.
+5. Set GPU capacity to zero. Set HPC capacity to zero if allowed; otherwise leave its minimum and don't use the HPC partition.
+6. Leave Slurm job accounting off. This demo does not need `sacct` or a separately configured MySQL database.
+7. Save the edits. Recheck the VM sizes and HTC cap. Watch the resource group and Cost Management for unexpected resources.
+
+If you cannot identify a hard maximum of one HTC worker or confirm the VM sizes, stop rather than guessing.
+
+## Step 4: Retry and wait for healthy nodes
+
+Only continue once quota is approved and the cluster settings are correct.
+
+1. In CycleCloud, select the failed Slurm node and use **Retry**. Don't retry the CycleCloud VM itself if it is already running.
+2. Watch the node state. It may show **Acquiring**, then **Preparing**, then **Ready/Started** while Azure creates and configures it.
+3. Check **Issues** or the node event log if it fails again. Stop and read the new error before retrying.
+4. Before running the job, make sure the Slurm scheduler and login/authentication node are ready, and no required node is failed.
+
+The CycleCloud UI's overall cluster state alone does not prove every node is healthy. A previous dashboard showed `1 failed` and `0 instances`; that cluster was not ready for jobs.
+
+## Step 5: Connect to the Slurm login node
+
+Do **not** run `sbatch` in Windows PowerShell, in the CycleCloud web page, or on the CycleCloud application VM. Run Slurm commands in a Linux terminal on the **Slurm login/authentication node**.
+
+From the CycleCloud page, select the **login/authentication node**, open its details, and copy its VM **ResourceId**. Use the login node's ID—not the CycleCloud VM ID and not the scheduler's network interface ID.
+
+Open Windows PowerShell. Sign into Azure and select the subscription used by the workspace:
 
 ```powershell
 az login
 az account set --subscription "YOUR_SUBSCRIPTION_ID"
+az account show --output table
 ```
 
-Then connect using the Bastion name, resource group, login-node resource ID, and SSH private key from your deployment:
+Start an SSH connection through your Bastion. Use the actual login-node resource ID, and make sure the SSH key path points to your private key on this computer:
 
 ```powershell
 az network bastion ssh `
@@ -73,28 +115,31 @@ az network bastion ssh `
   --ssh-key "$HOME\.ssh\hpc-interview-demo"
 ```
 
-Replace the resource ID with the actual login/authentication VM resource ID. If your deployment uses a different username or key path, use that value. Keep the private key on your computer; never paste it into chat or commit it to GitHub.
+Use your deployment's actual username/key path if different. The command should open a Linux shell. **Keep the private key private**; never paste it into chat or put it in GitHub.
 
-After connecting, the prompt is a **Linux shell on the login node**. Confirm that Slurm is available:
+Check that you reached the login machine and Slurm is responding:
 
 ```bash
 hostname
 sinfo
 ```
 
-If `sinfo` errors, or the scheduler/login node is failed, stop and resolve the CycleCloud/quota issue before continuing.
+If `sinfo` errors, the Slurm scheduler isn't ready. Go back to CycleCloud and resolve the node issue; don't continue submitting jobs.
 
-## 4. Get the small demo files onto the login node
+## Step 6: Download the project to the login node
 
-In the Linux login-node terminal, try:
+In the Linux terminal, use your shared home directory so compute nodes can read the job script:
 
 ```bash
+cd "$HOME"
 git clone https://github.com/karris12/bankofcanada.git
 cd bankofcanada
 ls
 ```
 
-You should see `README.md`, `docs`, and `workload`. The files must be in a directory shared with compute nodes. Check that the selected HTC partition can run a basic command and read the program:
+You should see `README.md`, `docs`, `tests`, and `workload`. If you already cloned it in this home folder, use `cd "$HOME/bankofcanada"` and then `git pull` instead of cloning again.
+
+Check that Slurm can run a tiny command on an HTC worker and that the worker can read the Python script:
 
 ```bash
 srun --partition=htc --nodes=1 --ntasks=1 hostname
@@ -102,29 +147,29 @@ srun --partition=htc --nodes=1 --ntasks=1 test -r "$PWD/workload/estimate_pi.py"
 echo $?
 ```
 
-The first command may wait while CycleCloud starts the one HTC worker. The second check should print exit code `0`. If it fails, move the repository to the deployment's shared home/work folder and repeat. If it reports quota or node failure, stop and resolve that issue; don't keep submitting jobs.
+The first command may take time while the HTC worker starts. The final output should be `0`. If it reports a quota, VM, or failed-node problem, stop and investigate in CycleCloud. If the final result is nonzero, the files are not on shared storage; follow your administrator's instructions for the shared home/work directory.
 
-If `git clone` fails because the node cannot reach GitHub, use an administrator-approved file-transfer method. Don't add an unpriced NAT gateway or open the cluster to the public internet just for this demo.
+If `git clone` fails because the login node can't reach GitHub, don't add an unpriced NAT gateway just for this demo. Ask your administrator for an approved file-transfer method.
 
-## 5. Submit one job
+## Step 7: Submit the one-job Slurm demo
 
-From the repository directory on the login node, submit the job:
+From the `bankofcanada` directory on the login node:
 
 ```bash
 sbatch workload/demo.sbatch
 ```
 
-Expected response:
+Slurm responds with a job ID, for example:
 
 ```text
 Submitted batch job 12345
 ```
 
-Your job ID will differ. `sbatch` hands the script to Slurm; the job requests one CPU and one HTC node.
+The actual ID will be different. The job script requests **one node, one task, one CPU, in the HTC partition**, and writes output to `slurm-<job-id>.out`.
 
-## 6. Check and read the result
+## Step 8: Monitor the job and show its output
 
-Replace `12345` with the job ID printed above:
+Replace `12345` with the job ID Slurm returned:
 
 ```bash
 squeue --jobs 12345
@@ -132,9 +177,9 @@ sinfo --partition=htc
 cat slurm-12345.out
 ```
 
-`squeue` shows a job while it is queued or running. `PD` means pending, `R` means running. This small job may finish before you run `squeue`, so an empty result is normal. `sinfo` shows the partition's available nodes.
+`squeue` displays the job while pending or running. `PD` means pending and `R` means running. The job is small, so it may finish before you check; an empty `squeue` result is okay. The output file is the record of the completed job.
 
-The `cat` command prints the saved job output. It should look like:
+Expected output shape:
 
 ```text
 Slurm job ID: 12345
@@ -145,34 +190,36 @@ Estimated pi: 3.14...
 Elapsed seconds: ...
 ```
 
-The exact node name, point count, pi estimate, and elapsed time vary. A result near `3.14` means the program ran successfully. The output file is named `slurm-<job-id>.out`.
+The exact node name, point count, estimate, and elapsed time vary. A result near `3.14` means the calculation completed successfully. If the file is missing or doesn't contain these lines, inspect CycleCloud **Issues** and the Slurm job state before retrying.
 
-If the job failed and accounting is enabled, inspect it with:
+You do not need job accounting or `sacct` for this first demo. The proof is: `sbatch` accepted the job, the output names the HTC compute node, and the program printed its pi estimate.
 
-```bash
-sacct --jobs 12345 --format=JobID,State,ExitCode
-```
+## Step 9: Explain what you demonstrated
 
-If accounting is disabled, which is fine for this demo, check the saved output and CycleCloud's node issues instead. You do not need a database or `sacct` to run a Slurm job.
+You can say:
 
-## 7. Explain it in the interview
+> “I submitted one Python job with `sbatch`. Slurm scheduled it on one CPU in the HTC partition. I checked the queue with `squeue`, viewed the partition with `sinfo`, and read the job output. CycleCloud manages Azure cluster lifecycle; Slurm schedules the workload.”
 
-> “I submitted one Python workload using `sbatch`. Slurm placed it in the HTC partition on one CPU worker. I monitored it with `squeue` and `sinfo`, then read the job's saved output. CycleCloud manages the Azure cluster lifecycle, and Slurm manages job scheduling.”
+This is a simple Slurm operations demo, not a performance benchmark. You don't need to claim the pi program is a large-scale HPC workload.
 
-If asked what makes it HPC: explain that this tiny example is a **first Slurm operations demo**, not a performance benchmark. Real HPC work would need representative parallel code, appropriate CPU/network/storage sizing, measured scaling, and cost-per-job analysis.
+## Step 10: Stop costs when you finish
 
-## 8. Clean up
+1. Check for your job: `squeue -u "$USER"`. If it is still running, cancel only your demo job with `scancel YOUR_JOB_ID`.
+2. In CycleCloud, terminate the Slurm cluster so worker/scheduler machines are removed or deallocated.
+3. Remember that terminating the Slurm cluster does **not** remove the CycleCloud workspace VM or Bastion.
+4. To end charges for this experiment, delete `rg-hpc-interview-demo` **only if you confirm it contains no unrelated resources and you no longer need the workspace**. In the Azure portal: **Resource groups** > `rg-hpc-interview-demo` > **Delete resource group**. Type the resource-group name to confirm.
+5. Review the resource group and Cost Management for leftover resources. Deleting Azure resources does not refund charges already accrued.
 
-After the demo, cancel only your own still-running job if necessary:
+## If starting from a completely new Azure subscription
 
-```bash
-scancel YOUR_JOB_ID
-```
+You do **not** need this section for your current deployment. It already has the workspace, network, storage, CycleCloud VM, and Bastion. Do not follow these steps to create a duplicate.
 
-In CycleCloud, terminate the Slurm cluster to remove its worker/scheduler resources when no longer needed. To stop charges for the whole experiment, also delete the **dedicated** `rg-hpc-interview-demo` resource group in Azure portal—but only after confirming it contains no unrelated resources. Recheck Cost Management and the resource list afterward. Costs already incurred are not refunded.
+For a brand-new deployment, first check credit, permissions, and pricing as in Step 2. Then follow Microsoft's current [CycleCloud Workspace for Slurm deployment guide](https://learn.microsoft.com/azure/cyclecloud/overview-ccws?view=cyclecloud-8) and [deployment planning checklist](https://learn.microsoft.com/azure/cyclecloud/how-to/ccws/plan-your-deployment?view=cyclecloud-8). Create a **new dedicated resource group** and a greenfield Workspace. Use only a secure login method you understand and have priced. Use a public SSH key, never a private key. Do not continue through an Entra, role-assignment, network, or cost prompt you don't understand. After deployment, follow Steps 3–10 here to create/configure Slurm, connect, run the job, and clean up.
 
-## Official references
+## Official Azure references
 
-- [CycleCloud Slurm 4 overview](https://learn.microsoft.com/azure/cyclecloud/slurm-4?view=cyclecloud-8)
+- [CycleCloud Workspace for Slurm overview](https://learn.microsoft.com/azure/cyclecloud/overview-ccws?view=cyclecloud-8)
+- [CycleCloud Workspace deployment planning](https://learn.microsoft.com/azure/cyclecloud/how-to/ccws/plan-your-deployment?view=cyclecloud-8)
+- [Azure quota increase instructions](https://learn.microsoft.com/azure/quotas/per-vm-quota-requests)
 - [Connect to a login node through Bastion](https://learn.microsoft.com/azure/cyclecloud/how-to/ccws/connect-to-login-node-with-bastion?view=cyclecloud-8)
-- [Azure quota requests](https://learn.microsoft.com/azure/quotas/per-vm-quota-requests)
+- [Start a CycleCloud cluster](https://learn.microsoft.com/azure/cyclecloud/how-to/start-cluster?view=cyclecloud-8)
