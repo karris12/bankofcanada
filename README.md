@@ -23,7 +23,7 @@ Elapsed seconds: 0.01
 
 ## Run on your CycleCloud Slurm cluster
 
-Read [`docs/DEMO_RUNBOOK.md`](docs/DEMO_RUNBOOK.md) for the start-to-finish guide. It explains the existing East US quota failure, how to reuse the current Azure deployment, connect to the login node, and run and show the job. Run these commands **on the Linux Slurm login node**, from this repository's directory:
+Read [`docs/DEMO_RUNBOOK.md`](docs/DEMO_RUNBOOK.md) for the start-to-finish guide. It assumes a fresh Azure deployment, checks quota and cost before provisioning, then walks through creating CycleCloud, configuring Slurm, connecting to the login node, running the job, and cleaning up. Run these commands **on the Linux Slurm login node**, from this repository's directory:
 
 ```bash
 sbatch workload/demo.sbatch
@@ -34,4 +34,24 @@ cat slurm-JOBID.out
 
 Replace `JOBID` with the number printed by `sbatch`. The job normally finishes quickly, so `squeue` may already be empty; its output is saved in `slurm-JOBID.out`.
 
-> The existing Azure deployment hit an East US regional-core quota limit. Resolve that quota issue before retrying cluster nodes or running Slurm jobs. Azure resources can continue to cost money while the cluster is unavailable.
+> The previous deployment hit the East US regional-core quota limit. Deleting its resources does not reset quota. Verify/request enough regional and VM-family quota before creating a new workspace.
+
+
+commands
+sinfo
+    - what happended to the resources
+
+squeue
+    - What is happening with the jobs now
+
+sbatch
+    - Submit my batch job
+
+srun
+    - Luanch slurm-managed jobs
+
+scancel
+    - Stop my job
+
+sacct
+    - what happened to my job
